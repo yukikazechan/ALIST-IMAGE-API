@@ -55,7 +55,7 @@
       </el-table-column>
       <el-table-column label="API URL">
         <template #default="{ row }">
-          <el-button link type="primary" @click="copyToClipboard(`http://localhost:8000/api/v1/random/${row.key}`)">Copy URL</el-button>
+          <el-button link type="primary" @click="copyToClipboard(`${window.location.origin}/api/v1/random/${row.key}`)">Copy URL</el-button>
         </template>
       </el-table-column>
       <el-table-column label="Actions">
