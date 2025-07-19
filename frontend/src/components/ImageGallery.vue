@@ -185,7 +185,6 @@ import { ref, reactive, onMounted, watch, defineExpose, defineEmits, defineProps
 import { getImages, deleteImage, updateImageTags, deleteImagesBulk, addTagsToImagesBulk, renameImage } from '../services/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Link, Edit, Delete } from '@element-plus/icons-vue';
-import ClipboardJS from 'clipboard';
 
 const props = defineProps({
   allTags: {
@@ -404,26 +403,53 @@ const handleBulkAddTags = async () => {
   }
 };
 
-const copyToClipboard = (text, event) => {
-  const clipboard = new ClipboardJS(event.currentTarget, {
-    text: () => text
-  });
+const copyToClipboard = (text) => {
+  console.log('Attempting to copy:', text);
+  // Use modern clipboard API in secure contexts
+  if (navigator.clipboard && window.isSecureContext) {
+    console.log('Using navigator.clipboard API.');
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Copy successful with navigator.clipboard');
+      ElMessage.success('Copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy with navigator.clipboard:', err);
+      ElMessage.error('Failed to copy! See console for details.');
+    });
+  } else {
+    // Fallback for older browsers or insecure contexts (HTTP)
+    console.log('Using fallback execCommand for insecure context or older browser.');
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    
+    // Make the textarea non-editable and move it off-screen
+    textArea.style.position = 'absolute';
+    textArea.style.left = '-9999px';
+    textArea.setAttribute('readonly', '');
 
-  clipboard.on('success', (e) => {
-    ElMessage.success('Copied to clipboard!');
-    e.clearSelection();
-    clipboard.destroy();
-  });
+    document.body.appendChild(textArea);
+    console.log('Fallback textarea appended to body.');
+    
+    textArea.select();
+    // For mobile devices
+    textArea.setSelectionRange(0, 99999);
 
-  clipboard.on('error', (e) => {
-    ElMessage.error('Failed to copy!');
-    console.error('Action:', e.action);
-    console.error('Trigger:', e.trigger);
-    clipboard.destroy();
-  });
+    try {
+      const successful = document.execCommand('copy');
+      console.log('document.execCommand successful:', successful);
+      if (successful) {
+        ElMessage.success('Copied to clipboard!');
+      } else {
+        ElMessage.error('Fallback copy failed: execCommand returned false.');
+        console.error('Fallback copy failed: execCommand returned false.');
+      }
+    } catch (err) {
+      console.error('Fallback copy failed with error:', err);
+      ElMessage.error('Fallback copy failed! See console for details.');
+    }
 
-  // Manually trigger the copy action
-  clipboard.onClick(event);
+    document.body.removeChild(textArea);
+    console.log('Fallback textarea removed from body.');
+  }
 };
 
 onMounted(fetchImages);
