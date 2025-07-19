@@ -28,11 +28,21 @@ fi
 echo "All system dependencies are met."
 echo "Step 2: Setting up Python virtual environment..."
 
-# Create and activate virtual environment
+# Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
+    echo "Creating Python virtual environment..."
     python3 -m venv venv
 fi
+
+# Verify that the virtual environment was created successfully
+if [ ! -f "venv/bin/activate" ]; then
+    echo "Error: Failed to create Python virtual environment. The 'venv/bin/activate' script was not found."
+    echo "Please check your Python 3 installation and ensure it's not a broken or minimal version."
+    exit 1
+fi
+
 source venv/bin/activate
+echo "Virtual environment activated."
 
 echo "Step 3: Installing Python packages..."
 pip install -r backend/requirements.txt
