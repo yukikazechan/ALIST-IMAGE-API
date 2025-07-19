@@ -38,3 +38,60 @@
 
 -   **用户名:** admin
 -   **密码:** admin
+
+---
+
+## Linux 环境故障排除
+
+如果您在运行 `install.sh` 时遇到关于 Python 或虚拟环境 (venv) 的错误，特别是提示 "Failed to create Python virtual environment"，这通常意味着您系统中的 Python 安装不完整或存在问题。
+
+以下是在 Debian/Ubuntu 系统上进行修复的推荐步骤：
+
+**1. 清理旧的/损坏的 Python 版本 (可选，但推荐)**
+
+如果您不确定当前的 Python 安装状态，最好先清理它。请谨慎操作，确保不会移除系统关键的 Python 版本。
+
+```bash
+# 查找所有已安装的 python3 版本
+dpkg -l | grep python3
+
+# 卸载特定的版本，例如 python3.10
+sudo apt-get purge python3.10
+sudo apt-get autoremove
+```
+
+**2. 安装一个干净、完整的 Python 环境**
+
+我们推荐安装 Python 3.10，这是一个稳定且兼容性好的版本。
+
+```bash
+sudo apt-get update
+# 安装 python3.10 本体, venv 支持, pip, 以及 C 语言编译所需的 dev 包
+sudo apt-get install -y python3.10 python3.10-venv python3-pip python3.10-dev
+```
+
+**3. 配置默认 Python 版本 (重要)**
+
+使用 `update-alternatives` 来管理系统中的多个 Python 版本，并设置 `python3` 命令的默认指向。
+
+```bash
+# 将 python3.10 添加到 alternatives 系统
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+
+# (可选) 如果您有其他版本，可以用此命令在它们之间切换
+sudo update-alternatives --config python3
+```
+
+**4. 验证安装**
+
+检查 Python 和 pip 的版本，确保它们都指向新安装的版本。
+
+```bash
+python3 --version
+# 应该输出: Python 3.10.x
+
+pip3 --version
+# 应该指向 python 3.10 的 site-packages
+```
+
+完成以上步骤后，您的 Linux 系统应该有了一个干净、完整的 Python 环境。现在，您可以回到项目根目录，重新运行 `bash install.sh`，安装过程应该可以顺利完成了。

@@ -1,76 +1,63 @@
 #!/bin/bash
 set -e # Exit immediately if a command exits with a non-zero status.
 
-# --- Helper Functions ---
-install_dependencies() {
-    echo "Updating package list..."
-    sudo apt-get update -y
-
-    # Install python3-venv if not present
-    if ! dpkg -l | grep -q python3-venv; then
-        echo "python3-venv not found. Attempting to install..."
-        sudo apt-get install -y python3-venv
-    fi
-
-    # Install Node.js and npm using nvm if not present
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        echo "Node.js or npm not found. Attempting to install using nvm..."
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts
-        # Source nvm again to use it in the current script
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    fi
-}
-
-# --- Main Script ---
 echo "Starting installation..."
+echo "Step 1: Checking system dependencies..."
 
-# Check for sudo permissions at the beginning
-if [ "$EUID" -ne 0 ]; then
-    echo "This script needs to install system packages. Please run with sudo or enter your password."
-    sudo -v
-    if [ $? -ne 0 ]; then
-        echo "Sudo permission denied. Exiting."
-        exit 1
-    fi
-fi
-
-# Check for essential tools
+# Check for Python 3
 if ! command -v python3 &> /dev/null; then
     echo "Error: Python 3 is not installed. Please install it first."
     exit 1
 fi
-if ! command -v curl &> /dev/null; then
-    echo "Error: curl is not installed. Please run 'sudo apt-get install curl' first."
+
+# Check for python3-venv on Debian/Ubuntu
+if command -v apt-get &> /dev/null; then
+    if ! dpkg -l | grep -q python3-venv; then
+        echo "Error: python3-venv is not installed. Please run 'sudo apt-get install python3-venv' first."
+        exit 1
+    fi
+fi
+
+# Check for Node.js and npm
+if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+    echo "Error: Node.js or npm is not installed. Please install them first."
+    echo "We recommend using nvm (Node Version Manager) for installation."
     exit 1
 fi
 
-# Install system dependencies if needed
-install_dependencies
+echo "All system dependencies are met."
+echo "Step 2: Setting up Python virtual environment..."
 
-echo "All system dependencies are installed."
-echo "Setting up Python virtual environment..."
-
-# Create and activate virtual environment
+# Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
+    echo "Creating Python virtual environment..."
     python3 -m venv venv
 fi
-source venv/bin/activate
 
-echo "Installing Python packages..."
+# Verify that the virtual environment was created successfully
+if [ ! -f "venv/bin/activate" ]; then
+    echo "Error: Failed to create Python virtual environment. The 'venv/bin/activate' script was not found."
+    echo "This usually means your Python 3 installation is broken or incomplete."
+    echo "Please see the 'Linux Environment Troubleshooting' section in README_zh.md for a solution."
+    exit 1
+fi
+
+source venv/bin/activate
+echo "Virtual environment activated."
+
+echo "Step 3: Installing Python packages..."
 pip install -r backend/requirements.txt
 
-echo "Installing Node.js packages..."
+echo "Step 4: Installing Node.js packages..."
 cd frontend
 npm install
 
-echo "Building frontend application..."
+echo "Step 5: Building frontend application..."
 npm run build
 cd ..
 
-echo "Creating .env file..."
+echo "Step 6: Creating .env file..."
+# Create .env file if it doesn't exist
 if [ ! -f ".env" ]; then
     echo "BACKEND_PORT=5235" > .env
 fi
