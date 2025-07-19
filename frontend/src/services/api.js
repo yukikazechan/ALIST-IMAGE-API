@@ -17,6 +17,11 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
+export const getAppConfig = async () => {
+  const response = await apiClient.get('/config');
+  return response.data;
+};
+
 export const getImages = async (params) => {
   // Filter out null or empty params before sending
   const filteredParams = Object.entries(params).reduce((acc, [key, value]) => {

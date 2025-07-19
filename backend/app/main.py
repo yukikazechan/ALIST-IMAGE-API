@@ -40,6 +40,21 @@ def get_db():
     finally:
         db.close()
 
+import os
+from fastapi import Request
+
+class AppConfig(schemas.BaseModel):
+    api_endpoint: str
+
+@app.get("/api/config", response_model=AppConfig)
+def get_app_config(request: Request):
+    # Construct the base URL from the request
+    # This is more reliable than env vars when behind a reverse proxy
+    base_url = str(request.base_url)
+    if base_url.endswith('/'):
+        base_url = base_url[:-1]
+    return AppConfig(api_endpoint=base_url)
+
 @app.post("/api/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if user.username == "admin":

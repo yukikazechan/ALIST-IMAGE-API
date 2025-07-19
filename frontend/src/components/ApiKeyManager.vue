@@ -53,9 +53,9 @@
           <el-tag v-for="tag in row.tags_or" :key="tag.id" type="info" style="margin-right: 5px;">{{ tag.name }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="API URL">
+      <el-table-column label="API Endpoint URL">
         <template #default="{ row }">
-          <el-button link type="primary" @click="copyToClipboard(`${window.location.origin}/api/v1/random/${row.key}`)">Copy URL</el-button>
+          <el-button link type="primary" @click="copyToClipboard(`${apiEndpoint}/api/v1/random/${row.key}`)">Copy</el-button>
         </template>
       </el-table-column>
       <el-table-column label="Actions">
@@ -69,8 +69,10 @@
 
 <script setup>
 import { ref, reactive, onMounted, defineProps, defineEmits } from 'vue';
-import { getApiKeys, addApiKey, deleteApiKey } from '../services/api';
+import { getApiKeys, addApiKey, deleteApiKey, getAppConfig } from '../services/api';
 import { ElMessage } from 'element-plus';
+
+const apiEndpoint = ref('');
 
 const props = defineProps({
   allTags: {
@@ -129,14 +131,63 @@ const handleDeleteKey = async (id) => {
 };
 
 const copyToClipboard = (text) => {
-  navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success('Copied to clipboard!');
-  }, () => {
-    ElMessage.error('Failed to copy!');
-  });
+  console.log('Attempting to copy:', text);
+  // Use modern clipboard API in secure contexts
+  if (navigator.clipboard && window.isSecureContext) {
+    console.log('Using navigator.clipboard API.');
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Copy successful with navigator.clipboard');
+      ElMessage.success('Copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy with navigator.clipboard:', err);
+      ElMessage.error('Failed to copy! See console for details.');
+    });
+  } else {
+    // Fallback for older browsers or insecure contexts (HTTP)
+    console.log('Using fallback execCommand for insecure context or older browser.');
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    
+    // Make the textarea non-editable and move it off-screen
+    textArea.style.position = 'absolute';
+    textArea.style.left = '-9999px';
+    textArea.setAttribute('readonly', '');
+
+    document.body.appendChild(textArea);
+    console.log('Fallback textarea appended to body.');
+    
+    textArea.select();
+    // For mobile devices
+    textArea.setSelectionRange(0, 99999);
+
+    try {
+      const successful = document.execCommand('copy');
+      console.log('document.execCommand successful:', successful);
+      if (successful) {
+        ElMessage.success('Copied to clipboard!');
+      } else {
+        ElMessage.error('Fallback copy failed: execCommand returned false.');
+        console.error('Fallback copy failed: execCommand returned false.');
+      }
+    } catch (err) {
+      console.error('Fallback copy failed with error:', err);
+      ElMessage.error('Fallback copy failed! See console for details.');
+    }
+
+    document.body.removeChild(textArea);
+    console.log('Fallback textarea removed from body.');
+  }
 };
 
-onMounted(() => {
+onMounted(async () => {
   fetchApiKeys();
+  try {
+    const config = await getAppConfig();
+    apiEndpoint.value = config.api_endpoint;
+    console.log('Fetched API endpoint:', apiEndpoint.value);
+  } catch (error) {
+    console.error('Failed to fetch app config:', error);
+    ElMessage.error('Could not load API endpoint configuration.');
+  }
 });
 </script>
