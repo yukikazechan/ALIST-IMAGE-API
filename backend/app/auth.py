@@ -10,7 +10,7 @@ SECRET_KEY = "a_very_secret_key"  # In a real app, use a more secure key and loa
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
 def create_access_token(data: dict):
     to_encode = data.copy()

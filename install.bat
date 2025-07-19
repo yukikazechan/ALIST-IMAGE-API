@@ -38,4 +38,5 @@ if not exist .env (
 )
 
 echo "Starting the application..."
-python -m backend.app.main
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 5235 --reload --app-dir .

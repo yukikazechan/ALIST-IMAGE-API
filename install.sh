@@ -65,4 +65,5 @@ echo "Starting the application..."
 echo "You can access it at http://localhost:5235"
 
 # Start the application
-python3 -m backend.app.main
+cd backend
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT:-5235} --reload --app-dir .

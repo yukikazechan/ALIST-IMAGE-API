@@ -12,7 +12,7 @@
         <el-tab-pane label="Image Gallery" name="gallery">
           <image-uploader :all-tags="allTags" @tags-updated="handleTagsUpdate" />
           <el-divider />
-          <image-gallery ref="gallery" :all-tags="allTags" @tags-updated="handleTagsUpdate" />
+          <image-gallery :key="galleryKey" :all-tags="allTags" @tags-updated="handleTagsUpdate" />
         </el-tab-pane>
         <el-tab-pane label="API Key Management" name="api-keys">
           <api-key-manager :all-tags="allTags" @tags-updated="handleTagsUpdate" />
@@ -48,11 +48,11 @@ import UserManagement from './components/UserManagement.vue';
 import UserProfile from './components/UserProfile.vue';
 import { getImages, getCurrentUser } from './services/api';
 
-const gallery = ref(null);
 const activeTab = ref('gallery');
 const allTags = ref([]);
 const isAuthenticated = ref(false);
 const currentUser = ref(null);
+const galleryKey = ref(0);
 const apiUrlBase = computed(() => window.location.origin);
 
 const fetchCurrentUser = async () => {
@@ -103,9 +103,7 @@ const fetchAllTags = async () => {
 
 const handleTagsUpdate = () => {
   fetchAllTags();
-  if (gallery.value) {
-    gallery.value.fetchImages();
-  }
+  galleryKey.value++;
 };
 
 onMounted(() => {

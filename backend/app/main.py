@@ -12,21 +12,6 @@ from .database import SessionLocal, engine, Base
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-import os
-from fastapi.staticfiles import StaticFiles
-
-# Get the absolute path to the frontend's dist directory
-static_files_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
-
-app.mount("/assets", StaticFiles(directory=os.path.join(static_files_dir, "assets")), name="assets")
-
-@app.get("/")
-async def read_index():
-    return FileResponse(os.path.join(static_files_dir, 'index.html'))
-
-@app.get("/{catchall:path}")
-async def read_spa(catchall: str):
-    return FileResponse(os.path.join(static_files_dir, 'index.html'))
 
 @app.on_event("startup")
 def on_startup():
@@ -57,6 +42,8 @@ def get_db():
 
 @app.post("/api/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    if user.username == "admin":
+        raise HTTPException(status_code=400, detail="Cannot register with username 'admin'")
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -219,12 +206,34 @@ async def get_random_image_by_key(key: str, db: Session = Depends(get_db)):
         except httpx.RequestError as exc:
             raise HTTPException(status_code=500, detail=f"Error fetching image from source: {exc}")
 
-import os
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=".env")
 
+# --- Static files and SPA hosting ---
+# This must be at the end of the file to ensure API routes are matched first.
+import os
+from fastapi.staticfiles import StaticFiles
+
+static_files_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+
+# Mount the 'assets' directory for CSS, JS, etc.
+app.mount("/assets", StaticFiles(directory=os.path.join(static_files_dir, "assets")), name="assets")
+
+# Serve the main index.html for the root path
+@app.get("/")
+async def read_index():
+    return FileResponse(os.path.join(static_files_dir, 'index.html'))
+
+# Serve the index.html for any other path to support Vue Router's history mode
+@app.get("/{catchall:path}")
+async def read_spa(catchall: str):
+    # Exclude API paths from being caught by the SPA catch-all
+    if catchall.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    return FileResponse(os.path.join(static_files_dir, 'index.html'))
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("BACKEND_PORT", 5235))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)

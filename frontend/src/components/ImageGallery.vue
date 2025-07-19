@@ -413,7 +413,6 @@ const copyToClipboard = (text) => {
 
 onMounted(fetchImages);
 
-defineExpose({ fetchImages });
 </script>
 
 <style scoped>
