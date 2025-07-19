@@ -34,6 +34,11 @@ sed -e "s|__USER__|$CURRENT_USER|g" \
 echo "Installing service file to /etc/systemd/system/..."
 mv alist-image-api.service /etc/systemd/system/alist-image-api.service
 
+# --- Grant Permissions ---
+echo "Granting ownership of the project directory to the service user..."
+chown -R "$CURRENT_USER:$CURRENT_GROUP" "$PROJECT_DIR"
+echo "Permissions granted."
+
 # Stop the service if it's already running
 if systemctl is-active --quiet alist-image-api.service; then
     echo "Stopping existing service..."
