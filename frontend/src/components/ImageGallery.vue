@@ -66,7 +66,7 @@
           />
           <div class="actions-overlay">
             <el-tooltip content="Copy Link" placement="top">
-              <el-button circle type="primary" icon="el-icon-link" @click.stop="copyToClipboard(image.url)" />
+              <el-button :data-clipboard-text="image.url" class="copy-btn" circle type="primary" icon="el-icon-link" @click.stop />
             </el-tooltip>
             <el-tooltip content="Rename" placement="top">
               <el-button circle type="info" icon="el-icon-edit-outline" @click.stop="openRenameDialog(image)" />
@@ -185,6 +185,7 @@ import { ref, reactive, onMounted, watch, defineExpose, defineEmits, defineProps
 import { getImages, deleteImage, updateImageTags, deleteImagesBulk, addTagsToImagesBulk, renameImage } from '../services/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Link, Edit, Delete } from '@element-plus/icons-vue';
+import ClipboardJS from 'clipboard';
 
 const props = defineProps({
   allTags: {
@@ -403,46 +404,22 @@ const handleBulkAddTags = async () => {
   }
 };
 
-const copyToClipboard = (text) => {
-  // Use the modern Clipboard API if available (requires HTTPS or localhost)
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(() => {
-      ElMessage.success('Copied to clipboard!');
-    }, (err) => {
-      console.error('Async: Could not copy text: ', err);
-      ElMessage.error('Failed to copy!');
-    });
-  } else {
-    // Fallback for older browsers or insecure contexts
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    
-    // Avoid scrolling to bottom
-    textArea.style.position = "fixed";
-    textArea.style.top = "0";
-    textArea.style.left = "0";
-    
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-      const successful = document.execCommand('copy');
-      if (successful) {
-        ElMessage.success('Copied to clipboard!');
-      } else {
-        ElMessage.error('Failed to copy!');
-      }
-    } catch (err) {
-      console.error('Fallback: Oops, unable to copy', err);
-      ElMessage.error('Failed to copy!');
-    }
-    
-    document.body.removeChild(textArea);
-  }
-};
+onMounted(() => {
+  fetchImages();
 
-onMounted(fetchImages);
+  const clipboard = new ClipboardJS('.copy-btn');
+
+  clipboard.on('success', (e) => {
+    ElMessage.success('Copied to clipboard!');
+    e.clearSelection();
+  });
+
+  clipboard.on('error', (e) => {
+    console.error('Action:', e.action);
+    console.error('Trigger:', e.trigger);
+    ElMessage.error('Failed to copy!');
+  });
+});
 
 </script>
 
