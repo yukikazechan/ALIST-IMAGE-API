@@ -4,41 +4,40 @@ set -e # Exit immediately if a command exits with a non-zero status.
 echo "Starting installation..."
 echo "Step 1: Checking system dependencies..."
 
-# Check for Python 3
-if ! command -v python3 &> /dev/null; then
-    echo "Error: Python 3 is not installed. Please install it first."
+# Check for Python 3 and pip3
+if ! command -v python3 &> /dev/null || ! command -v pip3 &> /dev/null; then
+    echo "Error: Python 3 or pip3 is not installed. Please install them first."
+    echo "On Debian/Ubuntu, run: sudo apt-get install python3 python3-pip python3-venv"
     exit 1
-fi
-
-# Check for python3-venv on Debian/Ubuntu
-if command -v apt-get &> /dev/null; then
-    if ! dpkg -l | grep -q python3-venv; then
-        echo "Error: python3-venv is not installed. Please run 'sudo apt-get install python3-venv' first."
-        exit 1
-    fi
 fi
 
 # Check for Node.js and npm
 if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     echo "Error: Node.js or npm is not installed. Please install them first."
-    echo "We recommend using nvm (Node Version Manager) for installation."
     exit 1
 fi
 
 echo "All system dependencies are met."
-echo "Step 2: Setting up Python virtual environment..."
+echo "Step 2: Setting up Python virtual environment using 'virtualenv'..."
 
-# Create virtual environment if it doesn't exist
+# Install virtualenv if it's not installed
+if ! command -v virtualenv &> /dev/null; then
+    echo "'virtualenv' command not found. Installing it via pip..."
+    pip3 install --user virtualenv
+    # Add user's local bin to PATH if it's not already there
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Create virtual environment using virtualenv
 if [ ! -d "venv" ]; then
-    echo "Creating Python virtual environment..."
-    python3 -m venv venv
+    echo "Creating Python virtual environment with 'virtualenv'..."
+    virtualenv venv
 fi
 
 # Verify that the virtual environment was created successfully
 if [ ! -f "venv/bin/activate" ]; then
-    echo "Error: Failed to create Python virtual environment. The 'venv/bin/activate' script was not found."
-    echo "This usually means your Python 3 installation is broken or incomplete."
-    echo "Please see the 'Linux Environment Troubleshooting' section in README_zh.md for a solution."
+    echo "Error: Failed to create Python virtual environment even with 'virtualenv'."
+    echo "Your Python installation is severely broken. Please reinstall Python completely."
     exit 1
 fi
 
@@ -57,7 +56,6 @@ npm run build
 cd ..
 
 echo "Step 6: Creating .env file..."
-# Create .env file if it doesn't exist
 if [ ! -f ".env" ]; then
     echo "BACKEND_PORT=5235" > .env
 fi
