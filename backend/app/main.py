@@ -217,21 +217,11 @@ from fastapi.staticfiles import StaticFiles
 
 static_files_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
-# Mount the 'assets' directory for CSS, JS, etc.
-app.mount("/assets", StaticFiles(directory=os.path.join(static_files_dir, "assets")), name="assets")
-
-# Serve the main index.html for the root path
-@app.get("/")
-async def read_index():
-    return FileResponse(os.path.join(static_files_dir, 'index.html'))
-
-# Serve the index.html for any other path to support Vue Router's history mode
-@app.get("/{catchall:path}")
-async def read_spa(catchall: str):
-    # Exclude API paths from being caught by the SPA catch-all
-    if catchall.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-    return FileResponse(os.path.join(static_files_dir, 'index.html'))
+# Mount the entire frontend as a static application.
+# The html=True flag enables SPA support by serving index.html for any path not found.
+# This single mount handles serving index.html, /assets/*, and other static files.
+# IMPORTANT: This must come AFTER all API routes are defined.
+app.mount("/", StaticFiles(directory=static_files_dir, html=True), name="spa")
 
 if __name__ == "__main__":
     import uvicorn
