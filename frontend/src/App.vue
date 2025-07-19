@@ -28,7 +28,7 @@
             <h2>How to use the API</h2>
             <p>You can get a random image by using the following API endpoint format. The API will act as a proxy and directly return the image, which can be used in `<img>` tags.</p>
             <h4>API Endpoint</h4>
-            <code>{{ window.location.origin }}/api/v1/random/YOUR_API_KEY</code>
+            <code>{{ apiUrlBase }}/api/v1/random/YOUR_API_KEY</code>
             <p>Replace <code>YOUR_API_KEY</code> with a key you generated in the "API Key Management" tab.</p>
             <p>The behavior of the endpoint (which tags to use and whether to match ALL or ANY of them) is defined when you create the API Key.</p>
           </el-card>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import ImageUploader from './components/ImageUploader.vue';
 import ImageGallery from './components/ImageGallery.vue';
 import ApiKeyManager from './components/ApiKeyManager.vue';
@@ -53,6 +53,7 @@ const activeTab = ref('gallery');
 const allTags = ref([]);
 const isAuthenticated = ref(false);
 const currentUser = ref(null);
+const apiUrlBase = computed(() => window.location.origin);
 
 const fetchCurrentUser = async () => {
   try {
