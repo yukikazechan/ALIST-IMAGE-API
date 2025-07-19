@@ -95,3 +95,26 @@ pip3 --version
 ```
 
 完成以上步骤后，您的 Linux 系统应该有了一个干净、完整的 Python 环境。现在，您可以回到项目根目录，重新运行 `bash install.sh`，安装过程应该可以顺利完成了。
+
+---
+
+## 设置开机自启动 (Linux with systemd)
+
+在您成功运行 `install.sh` 并确保应用可以启动后，如果您希望应用在服务器开机时自动在后台运行，可以运行 `setup_service.sh` 脚本。
+
+**重要**: 请确保您是在项目的主目录 (即 `ALIST-IMAGE-API` 目录) 中运行此脚本。
+
+```bash
+sudo bash setup_service.sh
+```
+
+该脚本会自动：
+1.  根据当前路径和用户，生成一个 `systemd` 服务文件。
+2.  将服务文件安装到系统中。
+3.  启动服务，并设置其为开机自启动。
+
+**服务管理命令:**
+-   检查服务状态: `sudo systemctl status alist-image-api.service`
+-   停止服务: `sudo systemctl stop alist-image-api.service`
+-   启动服务: `sudo systemctl start alist-image-api.service`
+-   查看实时日志: `sudo journalctl -u alist-image-api.service -f`
