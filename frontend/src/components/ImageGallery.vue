@@ -66,7 +66,7 @@
           />
           <div class="actions-overlay">
             <el-tooltip content="Copy Link" placement="top">
-              <el-button :data-clipboard-text="image.url" class="copy-btn" circle type="primary" icon="el-icon-link" @click.stop />
+              <el-button circle type="primary" icon="el-icon-link" @click.stop="copyToClipboard(image.url, $event)" />
             </el-tooltip>
             <el-tooltip content="Rename" placement="top">
               <el-button circle type="info" icon="el-icon-edit-outline" @click.stop="openRenameDialog(image)" />
@@ -404,22 +404,29 @@ const handleBulkAddTags = async () => {
   }
 };
 
-onMounted(() => {
-  fetchImages();
-
-  const clipboard = new ClipboardJS('.copy-btn');
+const copyToClipboard = (text, event) => {
+  const clipboard = new ClipboardJS(event.currentTarget, {
+    text: () => text
+  });
 
   clipboard.on('success', (e) => {
     ElMessage.success('Copied to clipboard!');
     e.clearSelection();
+    clipboard.destroy();
   });
 
   clipboard.on('error', (e) => {
+    ElMessage.error('Failed to copy!');
     console.error('Action:', e.action);
     console.error('Trigger:', e.trigger);
-    ElMessage.error('Failed to copy!');
+    clipboard.destroy();
   });
-});
+
+  // Manually trigger the copy action
+  clipboard.onClick(event);
+};
+
+onMounted(fetchImages);
 
 </script>
 
