@@ -105,6 +105,26 @@ pip3 --version
 
 完成以上步骤后，您的 Linux 系统应该有了一个干净、完整的 Python 环境。现在，您可以回到项目根目录，重新运行 `bash install.sh`，安装过程应该可以顺利完成了。
 
+#### Git 拉取失败 (dubious ownership)
+
+当您以 `root` 用户身份在属于其他用户（例如 `myuser`）的目录中执行 `git pull` 时，可能会遇到 `fatal: detected dubious ownership in repository` 错误。这是 Git 的一项安全措施。
+
+**解决方案：**
+
+*   **(推荐)** 切换到目录的所有者用户再执行 `git pull`：
+    ```bash
+    # 将 myuser 替换为实际的用户名
+    sudo -iu myuser
+    cd /path/to/your/project
+    git pull
+    ```
+*   **(快速修复)** 或者，将该目录对 `root` 用户标记为安全：
+    ```bash
+    # 将 /path/to/your/project 替换为实际的项目路径
+    git config --global --add safe.directory /path/to/your/project
+    # 然后再以 root 身份执行 git pull
+    ```
+
 ---
 
 ## 设置开机自启动 (Linux with systemd)

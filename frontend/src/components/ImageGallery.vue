@@ -66,7 +66,7 @@
           />
           <div class="actions-overlay">
             <el-tooltip content="Copy Link" placement="top">
-              <el-button circle type="primary" icon="el-icon-link" @click.stop="copyToClipboard(image.url)" />
+              <el-button circle type="primary" icon="el-icon-link" @click.stop="copyToClipboard(image.url, $event)" />
             </el-tooltip>
             <el-tooltip content="Rename" placement="top">
               <el-button circle type="info" icon="el-icon-edit-outline" @click.stop="openRenameDialog(image)" />
@@ -185,6 +185,7 @@ import { ref, reactive, onMounted, watch, defineExpose, defineEmits, defineProps
 import { getImages, deleteImage, updateImageTags, deleteImagesBulk, addTagsToImagesBulk, renameImage } from '../services/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Link, Edit, Delete } from '@element-plus/icons-vue';
+import ClipboardJS from 'clipboard';
 
 const props = defineProps({
   allTags: {
@@ -403,12 +404,26 @@ const handleBulkAddTags = async () => {
   }
 };
 
-const copyToClipboard = (text) => {
-  navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success('Copied to clipboard!');
-  }, () => {
-    ElMessage.error('Failed to copy!');
+const copyToClipboard = (text, event) => {
+  const clipboard = new ClipboardJS(event.currentTarget, {
+    text: () => text
   });
+
+  clipboard.on('success', (e) => {
+    ElMessage.success('Copied to clipboard!');
+    e.clearSelection();
+    clipboard.destroy();
+  });
+
+  clipboard.on('error', (e) => {
+    ElMessage.error('Failed to copy!');
+    console.error('Action:', e.action);
+    console.error('Trigger:', e.trigger);
+    clipboard.destroy();
+  });
+
+  // Manually trigger the copy action
+  clipboard.onClick(event);
 };
 
 onMounted(fetchImages);
