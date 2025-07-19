@@ -5,8 +5,8 @@ After=network.target
 [Service]
 User=__USER__
 Group=__GROUP__
-WorkingDirectory=__WORKING_DIRECTORY__
-ExecStart=__WORKING_DIRECTORY__/venv/bin/python3 -m backend.app.main
+WorkingDirectory=__WORKING_DIRECTORY__/backend
+ExecStart=__WORKING_DIRECTORY__/venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 5235
 Restart=always
 RestartSec=3
 
