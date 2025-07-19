@@ -16,6 +16,13 @@ CURRENT_GROUP=$(id -gn "$CURRENT_USER")
 # Get the absolute path of the project directory
 PROJECT_DIR=$(pwd)
 
+# --- Force Rebuild Frontend ---
+echo "Forcing a rebuild of the frontend to ensure it's up-to-date..."
+cd frontend
+npm run build
+cd ..
+echo "Frontend rebuild complete."
+
 # Create the service file from the template
 echo "Creating service file..."
 sed -e "s|__USER__|$CURRENT_USER|g" \
@@ -26,6 +33,12 @@ sed -e "s|__USER__|$CURRENT_USER|g" \
 # Move the service file to the systemd directory
 echo "Installing service file to /etc/systemd/system/..."
 mv alist-image-api.service /etc/systemd/system/alist-image-api.service
+
+# Stop the service if it's already running
+if systemctl is-active --quiet alist-image-api.service; then
+    echo "Stopping existing service..."
+    systemctl stop alist-image-api.service
+fi
 
 # Reload systemd, enable and start the service
 echo "Reloading systemd and starting the service..."
