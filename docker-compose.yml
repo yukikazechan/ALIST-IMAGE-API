@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  alist-image-api:
+    build: .
+    container_name: alist-image-api
+    restart: unless-stopped
+    ports:
+      - "5235:5235"
+    environment:
+      - BACKEND_PORT=5235
+      - ADMIN_USER=admin
+      - ADMIN_PASS=adminpassword123
+      - SECRET_KEY=your_secure_secret_jwt_key
+    volumes:
+      - ./data:/app/data
