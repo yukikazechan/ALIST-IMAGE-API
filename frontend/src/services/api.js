@@ -1,106 +1,78 @@
 import axios from 'axios';
 
-export const apiClient = axios.create({
-  baseURL: '/api',
+const apiClient = axios.create({
+  baseURL: '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-apiClient.interceptors.request.use(config => {
+apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  console.log('Interceptor running. Token:', token); // Debugging line
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('Authorization header set:', config.headers.Authorization); // Debugging line
   }
   return config;
 });
 
-export const getAppConfig = async () => {
-  const response = await apiClient.get('/config');
-  return response.data;
-};
-
-export const getImages = async (params) => {
-  // Filter out null or empty params before sending
-  const filteredParams = Object.entries(params).reduce((acc, [key, value]) => {
-    if (value !== null && value !== '' && value !== undefined) {
-      acc[key] = value;
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.reload();
     }
-    return acc;
-  }, {});
+    return Promise.reject(error);
+  }
+);
 
-  const response = await apiClient.get('/images/', { params: filteredParams });
-  return response.data;
-};
+export default {
+  // Auth
+  login(username, password) {
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', password);
+    return apiClient.post('/auth/login', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  getMe() {
+    return apiClient.get('/auth/me');
+  },
 
-export const getApiKeys = async () => {
-  const response = await apiClient.get('/keys/');
-  return response.data;
-};
+  // Dashboard Stats
+  getDashboardStats() {
+    return apiClient.get('/admin/dashboard/stats');
+  },
 
-export const addApiKey = async (keyData) => {
-  const response = await apiClient.post('/keys/', keyData);
-  return response.data;
-};
+  // Sources & AList Sync
+  getSources() {
+    return apiClient.get('/admin/sources');
+  },
+  createSource(data) {
+    return apiClient.post('/admin/sources', data);
+  },
+  syncSource(sourceId) {
+    return apiClient.post(`/admin/sources/${sourceId}/sync`);
+  },
 
-export const updateImageTags = async (id, tags) => {
-  const response = await apiClient.put(`/images/${id}/tags`, { tags });
-  return response.data;
-};
+  // Images
+  getImages(params) {
+    return apiClient.get('/admin/images', { params });
+  },
+  batchTagImages(data) {
+    return apiClient.post('/admin/images/batch-tag', data);
+  },
 
-export const deleteApiKey = async (id) => {
-  const response = await apiClient.delete(`/keys/${id}`);
-  return response.data;
-};
-
-export const addImage = async (imageData) => {
-  const response = await apiClient.post('/images/', imageData);
-  return response.data;
-};
-
-export const addBulkImages = async (bulkData) => {
-  const response = await apiClient.post('/images/bulk', bulkData);
-  return response.data;
-};
-
-export const deleteImage = async (id) => {
-  const response = await apiClient.delete(`/images/${id}`);
-  return response.data;
-};
-
-export const deleteImagesBulk = async (imageIds) => {
-  const response = await apiClient.post('/images/bulk-delete', { image_ids: imageIds });
-  return response.data;
-};
-
-export const addTagsToImagesBulk = async (imageIds, tags) => {
-  const response = await apiClient.post('/images/bulk-add-tags', { image_ids: imageIds, tags: tags });
-  return response.data;
-};
-
-export const getUsers = async () => {
-  const response = await apiClient.get('/users/');
-  return response.data;
-};
-
-export const deleteUser = async (userId) => {
-  const response = await apiClient.delete(`/users/${userId}`);
-  return response.data;
-};
-
-export const getCurrentUser = async () => {
-  const response = await apiClient.get('/users/me');
-  return response.data;
-};
-
-export const updateCurrentUser = async (userData) => {
-  const response = await apiClient.put('/users/me', userData);
-  return response.data;
-};
-
-export const renameImage = async (imageId, newFilename) => {
-  const response = await apiClient.put(`/images/${imageId}/rename`, { filename: newFilename });
-  return response.data;
+  // API Keys
+  getApiKeys() {
+    return apiClient.get('/admin/keys');
+  },
+  createApiKey(data) {
+    return apiClient.post('/admin/keys', data);
+  },
+  deleteApiKey(keyId) {
+    return apiClient.delete(`/admin/keys/${keyId}`);
+  }
 };
