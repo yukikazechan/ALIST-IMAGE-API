@@ -1,257 +1,280 @@
+import json
+import secrets
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import func, or_, and_, desc
 from . import models, schemas
-import random
-import uuid
-from urllib.parse import unquote
-import os
-from passlib.context import CryptContext
+from .auth import get_password_hash
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_user(db: Session, user_id: int):
+# ==================== User CRUD ====================
+def get_user(db: Session, user_id: int) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.id == user_id).first()
 
-def get_user_by_username(db: Session, username: str):
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.username == username).first()
 
-def get_users(db: Session, skip: int = 0, limit: int = 100):
+def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[models.User]:
     return db.query(models.User).offset(skip).limit(limit).all()
 
-def delete_user_by_id(db: Session, user_id: int):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if db_user:
-        db.delete(db_user)
-        db.commit()
-    return db_user
-
-def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not db_user:
-        return None
-    
-    if user_update.username:
-        db_user.username = user_update.username
-    
-    if user_update.password:
-        db_user.hashed_password = pwd_context.hash(user_update.password)
-        
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-def create_user(db: Session, user: schemas.UserCreate, is_admin: bool = False):
-    hashed_password = pwd_context.hash(user.password)
-    db_user = models.User(username=user.username, hashed_password=hashed_password, is_admin=is_admin)
+def create_user(db: Session, user: schemas.UserCreate, is_admin: bool = False) -> models.User:
+    hashed_password = get_password_hash(user.password)
+    db_user = models.User(
+        username=user.username,
+        hashed_password=hashed_password,
+        is_admin=is_admin
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
-def get_tag_by_name(db: Session, name: str):
-    return db.query(models.Tag).filter(models.Tag.name == name).first()
-
-def create_tag(db: Session, tag: schemas.TagCreate):
-    db_tag = models.Tag(name=tag.name)
-    db.add(db_tag)
+def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate) -> Optional[models.User]:
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    if user_update.username is not None:
+        db_user.username = user_update.username
+    if user_update.password is not None:
+        db_user.hashed_password = get_password_hash(user_update.password)
+    if user_update.is_active is not None:
+        db_user.is_active = user_update.is_active
     db.commit()
-    db.refresh(db_tag)
-    return db_tag
+    db.refresh(db_user)
+    return db_user
 
-def create_image(db: Session, image: schemas.ImageCreate, user_id: int):
-    filename = unquote(os.path.basename(image.url))
-    filetype = os.path.splitext(filename)[1]
-    db_image = models.Image(
-        url=image.url,
-        description=image.description,
-        filename=filename,
-        filetype=filetype,
-        owner_id=user_id
+def delete_user(db: Session, user_id: int) -> bool:
+    db_user = get_user(db, user_id)
+    if db_user:
+        db.delete(db_user)
+        db.commit()
+        return True
+    return False
+
+
+# ==================== StorageSource CRUD ====================
+def get_sources(db: Session) -> List[models.StorageSource]:
+    return db.query(models.StorageSource).all()
+
+def get_source(db: Session, source_id: int) -> Optional[models.StorageSource]:
+    return db.query(models.StorageSource).filter(models.StorageSource.id == source_id).first()
+
+def create_source(db: Session, source_in: schemas.StorageSourceCreate) -> models.StorageSource:
+    db_source = models.StorageSource(
+        name=source_in.name,
+        base_url=source_in.base_url.rstrip("/"),
+        root_path=source_in.root_path,
+        token=source_in.token,
+        auto_sync_interval=source_in.auto_sync_interval
     )
-    
-    for tag_name in image.tags:
-        db_tag = get_tag_by_name(db, name=tag_name)
-        if db_tag is None:
-            db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-        db_image.tags.append(db_tag)
-        
-    db.add(db_image)
+    db.add(db_source)
     db.commit()
-    db.refresh(db_image)
-    return db_image
+    db.refresh(db_source)
+    return db_source
 
-def create_bulk_images(db: Session, bulk_data: schemas.ImageBulkCreate, user_id: int):
-    created_images = []
-    for url in bulk_data.urls:
-        # Skip if image with this URL already exists
-        existing_image = db.query(models.Image).filter(models.Image.url == url).first()
-        if existing_image:
-            continue
-
-        filename = unquote(os.path.basename(url))
-        filetype = os.path.splitext(filename)[1]
-        db_image = models.Image(url=url, filename=filename, filetype=filetype, owner_id=user_id)
-        for tag_name in bulk_data.tags:
-            db_tag = get_tag_by_name(db, name=tag_name)
-            if db_tag is None:
-                db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-            db_image.tags.append(db_tag)
-        
-        db.add(db_image)
-        created_images.append(db_image)
-    
+def update_source(db: Session, source_id: int, source_update: schemas.StorageSourceUpdate) -> Optional[models.StorageSource]:
+    db_source = get_source(db, source_id)
+    if not db_source:
+        return None
+    data = source_update.model_dump(exclude_unset=True)
+    if "base_url" in data and data["base_url"]:
+        data["base_url"] = data["base_url"].rstrip("/")
+    for k, v in data.items():
+        setattr(db_source, k, v)
     db.commit()
-    for img in created_images:
-        db.refresh(img)
-    return created_images
+    db.refresh(db_source)
+    return db_source
 
-def get_images(db: Session, user_id: int, skip: int = 0, limit: int = 10, tags: list[str] | None = None, sort_by: str = 'created_at', sort_order: str = 'desc', filename_like: str | None = None):
-    query = db.query(models.Image).filter(models.Image.owner_id == user_id)
+def delete_source(db: Session, source_id: int) -> bool:
+    db_source = get_source(db, source_id)
+    if db_source:
+        db.delete(db_source)
+        db.commit()
+        return True
+    return False
 
-    if tags:
-        for tag_name in tags:
-            query = query.filter(models.Image.tags.any(name=tag_name))
-    
-    if filename_like:
-        query = query.filter(models.Image.filename.ilike(f"%{filename_like}%"))
 
-    sort_column = getattr(models.Image, sort_by, models.Image.created_at)
-    if sort_order == 'desc':
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+# ==================== Tag CRUD ====================
+def get_or_create_tag(db: Session, name: str) -> models.Tag:
+    clean_name = name.strip()
+    tag = db.query(models.Tag).filter(models.Tag.name == clean_name).first()
+    if not tag:
+        tag = models.Tag(name=clean_name, slug=clean_name.lower())
+        db.add(tag)
+        db.commit()
+        db.refresh(tag)
+    return tag
+
+def get_tags(db: Session, skip: int = 0, limit: int = 100) -> List[models.Tag]:
+    return db.query(models.Tag).order_by(desc(models.Tag.image_count)).offset(skip).limit(limit).all()
+
+
+# ==================== Image CRUD ====================
+def get_images(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    tag: Optional[str] = None,
+    source_id: Optional[int] = None,
+    orientation: Optional[str] = None,
+    is_active: Optional[bool] = None
+) -> Tuple[List[models.Image], int]:
+    query = db.query(models.Image)
+    if source_id is not None:
+        query = query.filter(models.Image.source_id == source_id)
+    if orientation is not None and orientation != "all":
+        query = query.filter(models.Image.orientation == orientation)
+    if is_active is not None:
+        query = query.filter(models.Image.is_active == is_active)
+    if tag:
+        query = query.filter(models.Image.tags.any(models.Tag.name == tag))
     
     total = query.count()
-    images = query.offset(skip).limit(limit).all()
-    return {"total": total, "images": images}
+    images = query.order_by(desc(models.Image.id)).offset(skip).limit(limit).all()
+    return images, total
 
-def delete_image(db: Session, image_id: int, user_id: int):
-    db_image = db.query(models.Image).filter(models.Image.id == image_id, models.Image.owner_id == user_id).first()
-    if db_image:
-        db.delete(db_image)
+def get_image(db: Session, image_id: int) -> Optional[models.Image]:
+    return db.query(models.Image).filter(models.Image.id == image_id).first()
+
+def get_image_by_filepath(db: Session, file_path: str) -> Optional[models.Image]:
+    return db.query(models.Image).filter(models.Image.file_path == file_path).first()
+
+def create_or_update_image(db: Session, img_in: schemas.ImageCreate, source_id: Optional[int] = None) -> models.Image:
+    existing = get_image_by_filepath(db, img_in.file_path)
+    if existing:
+        existing.raw_url = img_in.raw_url
+        existing.filename = img_in.filename or existing.filename
+        existing.file_size = img_in.file_size or existing.file_size
+        existing.mime_type = img_in.mime_type or existing.mime_type
+        existing.width = img_in.width or existing.width
+        existing.height = img_in.height or existing.height
+        existing.orientation = img_in.orientation or existing.orientation
         db.commit()
-    return db_image
+        db.refresh(existing)
+        return existing
 
-def delete_images_bulk(db: Session, image_ids: list[int], user_id: int):
-    db.query(models.Image).filter(models.Image.id.in_(image_ids), models.Image.owner_id == user_id).delete(synchronize_session=False)
-    db.commit()
-    return {"status": "success", "deleted_ids": image_ids}
-
-def update_image_tags(db: Session, image_id: int, tags: list[str], user_id: int):
-    db_image = db.query(models.Image).filter(models.Image.id == image_id, models.Image.owner_id == user_id).first()
-    if not db_image:
-        return None
-
-    # Clear existing tags
-    db_image.tags.clear()
-
-    # Add new tags
-    for tag_name in tags:
-        db_tag = get_tag_by_name(db, name=tag_name)
-        if db_tag is None:
-            db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-        db_image.tags.append(db_tag)
-    
-    db.commit()
-    db.refresh(db_image)
-    return db_image
-
-def add_tags_to_images_bulk(db: Session, image_ids: list[int], tags: list[str], user_id: int):
-    images = db.query(models.Image).filter(models.Image.id.in_(image_ids), models.Image.owner_id == user_id).all()
-    if not images:
-        return None
-
-    for image in images:
-        for tag_name in tags:
-            db_tag = get_tag_by_name(db, name=tag_name)
-            if db_tag is None:
-                db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-            if db_tag not in image.tags:
-                image.tags.append(db_tag)
-    
-    db.commit()
-    return images
-
-def update_image_filename(db: Session, image_id: int, filename: str, user_id: int):
-    db_image = db.query(models.Image).filter(models.Image.id == image_id, models.Image.owner_id == user_id).first()
-    if not db_image:
-        return None
-    
-    db_image.filename = filename
-    db.commit()
-    db.refresh(db_image)
-    return db_image
-
-def get_random_image(db: Session, tag_name: str | None = None):
-    query = db.query(models.Image)
-    if tag_name:
-        query = query.join(models.Image.tags).filter(models.Tag.name == tag_name)
-    
-    images = query.all()
-    if not images:
-        return None
-    
-    return random.choice(images)
-
-def get_api_key_by_key(db: Session, key: str):
-    return db.query(models.ApiKey).filter(models.ApiKey.key == key).first()
-
-def get_api_keys(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.ApiKey).filter(models.ApiKey.owner_id == user_id).offset(skip).limit(limit).all()
-
-def create_api_key(db: Session, api_key: schemas.ApiKeyCreate, user_id: int):
-    db_api_key = models.ApiKey(
-        key=str(uuid.uuid4()),
-        name=api_key.name,
-        owner_id=user_id
+    tags_obj = [get_or_create_tag(db, t) for t in img_in.tags if t.strip()]
+    db_img = models.Image(
+        source_id=source_id,
+        file_path=img_in.file_path,
+        raw_url=img_in.raw_url,
+        filename=img_in.filename or img_in.file_path.split("/")[-1],
+        file_size=img_in.file_size,
+        mime_type=img_in.mime_type,
+        width=img_in.width,
+        height=img_in.height,
+        orientation=img_in.orientation,
+        tags=tags_obj
     )
-    
-    for tag_name in api_key.tags_and:
-        db_tag = get_tag_by_name(db, name=tag_name)
-        if db_tag is None:
-            db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-        db_api_key.tags_and.append(db_tag)
-
-    for tag_name in api_key.tags_or:
-        db_tag = get_tag_by_name(db, name=tag_name)
-        if db_tag is None:
-            db_tag = create_tag(db, schemas.TagCreate(name=tag_name))
-        db_api_key.tags_or.append(db_tag)
-        
-    db.add(db_api_key)
+    db.add(db_img)
     db.commit()
-    db.refresh(db_api_key)
-    return db_api_key
+    db.refresh(db_img)
+    return db_img
 
-def delete_api_key(db: Session, api_key_id: int, user_id: int):
-    db_api_key = db.query(models.ApiKey).filter(models.ApiKey.id == api_key_id, models.ApiKey.owner_id == user_id).first()
-    if db_api_key:
-        db.delete(db_api_key)
+def batch_update_tags(db: Session, image_ids: List[int], add_tags: List[str], remove_tags: List[str]) -> int:
+    images = db.query(models.Image).filter(models.Image.id.in_(image_ids)).all()
+    add_tag_objs = [get_or_create_tag(db, t) for t in add_tags if t.strip()]
+    count = 0
+    for img in images:
+        current_tags = set(img.tags)
+        for t in add_tag_objs:
+            current_tags.add(t)
+        if remove_tags:
+            current_tags = {t for t in current_tags if t.name not in remove_tags}
+        img.tags = list(current_tags)
+        count += 1
+    db.commit()
+    return count
+
+def delete_image(db: Session, image_id: int) -> bool:
+    db_img = get_image(db, image_id)
+    if db_img:
+        db.delete(db_img)
         db.commit()
-    return db_api_key
+        return True
+    return False
 
-def get_random_image_by_api_key(db: Session, key: str):
-    api_key = get_api_key_by_key(db, key=key)
-    if not api_key:
+
+# ==================== ApiKey CRUD ====================
+def generate_api_key() -> str:
+    return f"ak_live_{secrets.token_hex(16)}"
+
+def get_api_key_by_key(db: Session, key: str) -> Optional[models.ApiKey]:
+    return db.query(models.ApiKey).filter(models.ApiKey.key == key, models.ApiKey.is_active == True).first()
+
+def get_api_keys(db: Session, owner_id: Optional[int] = None) -> List[models.ApiKey]:
+    query = db.query(models.ApiKey)
+    if owner_id:
+        query = query.filter(models.ApiKey.owner_id == owner_id)
+    return query.order_by(desc(models.ApiKey.id)).all()
+
+def create_api_key(db: Session, key_in: schemas.ApiKeyCreate, owner_id: int) -> models.ApiKey:
+    db_key = models.ApiKey(
+        key=generate_api_key(),
+        name=key_in.name,
+        owner_id=owner_id,
+        allowed_tags_and=json.dumps(key_in.allowed_tags_and, ensure_ascii=False),
+        allowed_tags_or=json.dumps(key_in.allowed_tags_or, ensure_ascii=False),
+        blocked_tags=json.dumps(key_in.blocked_tags, ensure_ascii=False),
+        orientation_filter=key_in.orientation_filter,
+        rate_limit_qpm=key_in.rate_limit_qpm,
+        daily_quota=key_in.daily_quota,
+        referer_whitelist=json.dumps(key_in.referer_whitelist, ensure_ascii=False),
+        ip_whitelist=json.dumps(key_in.ip_whitelist, ensure_ascii=False)
+    )
+    db.add(db_key)
+    db.commit()
+    db.refresh(db_key)
+    return db_key
+
+def update_api_key(db: Session, key_id: int, key_update: schemas.ApiKeyUpdate) -> Optional[models.ApiKey]:
+    db_key = db.query(models.ApiKey).filter(models.ApiKey.id == key_id).first()
+    if not db_key:
         return None
+    data = key_update.model_dump(exclude_unset=True)
+    json_fields = ["allowed_tags_and", "allowed_tags_or", "blocked_tags", "referer_whitelist", "ip_whitelist"]
+    for k, v in data.items():
+        if k in json_fields:
+            setattr(db_key, k, json.dumps(v, ensure_ascii=False))
+        else:
+            setattr(db_key, k, v)
+    db.commit()
+    db.refresh(db_key)
+    return db_key
+
+def delete_api_key(db: Session, key_id: int) -> bool:
+    db_key = db.query(models.ApiKey).filter(models.ApiKey.id == key_id).first()
+    if db_key:
+        db.delete(db_key)
+        db.commit()
+        return True
+    return False
+
+
+# ==================== Dashboard Stats CRUD ====================
+def get_dashboard_stats(db: Session) -> dict:
+    total_images = db.query(func.count(models.Image.id)).scalar() or 0
+    total_sources = db.query(func.count(models.StorageSource.id)).scalar() or 0
+    total_tags = db.query(func.count(models.Tag.id)).scalar() or 0
+    total_api_keys = db.query(func.count(models.ApiKey.id)).scalar() or 0
+    total_calls_all_time = db.query(func.sum(models.ApiKey.total_calls)).scalar() or 0
     
-    tags_and = {tag.name for tag in api_key.tags_and}
-    tags_or = {tag.name for tag in api_key.tags_or}
+    top_tags = db.query(
+        models.Tag.name,
+        func.count(models.image_tag_association.c.image_id).label("count")
+    ).join(models.image_tag_association, models.Tag.id == models.image_tag_association.c.tag_id, isouter=True)\
+     .group_by(models.Tag.id)\
+     .order_by(desc("count"))\
+     .limit(10).all()
 
-    if not tags_and and not tags_or:
-        return get_random_image(db)
+    recent_sources = db.query(models.StorageSource).order_by(desc(models.StorageSource.id)).limit(5).all()
 
-    query = db.query(models.Image)
-
-    if tags_and:
-        for tag_name in tags_and:
-            query = query.filter(models.Image.tags.any(name=tag_name))
-    
-    if tags_or:
-        query = query.filter(or_(*[models.Image.tags.any(name=tag_name) for tag_name in tags_or]))
-
-    images = query.distinct().all()
-    if not images:
-        return None
-        
-    return random.choice(images)
+    return {
+        "total_images": total_images,
+        "total_sources": total_sources,
+        "total_tags": total_tags,
+        "total_api_keys": total_api_keys,
+        "total_calls_all_time": int(total_calls_all_time),
+        "calls_today": 0,
+        "top_tags": [{"name": t[0], "count": t[1]} for t in top_tags],
+        "recent_sources": recent_sources
+    }
