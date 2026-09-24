@@ -1,200 +1,91 @@
 <template>
-  <div v-if="!isAuthenticated">
-    <Login @authenticated="handleAuthentication" />
-  </div>
-  <div v-else class="app-container">
-    <header class="app-header">
-      <h1>Alist Image API</h1>
-      <el-button @click="handleLogout" class="logout-button">Logout</el-button>
+  <div class="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <!-- Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-100">
+            AI
+          </div>
+          <div>
+            <h1 class="text-base font-bold tracking-tight text-slate-900">ALIST-IMAGE-API</h1>
+            <span class="text-[10px] text-indigo-600 font-semibold uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded">v2.0 Pro</span>
+          </div>
+        </div>
+
+        <div v-if="token" class="flex items-center gap-1 sm:gap-2">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            @click="activeTab = tab.id"
+            :class="[
+              activeTab === tab.id ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+              'px-3.5 py-2 rounded-xl text-sm transition-all'
+            ]"
+          >
+            {{ tab.name }}
+          </button>
+          <button
+            @click="logout"
+            class="ml-2 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-xl transition-all font-medium"
+          >
+            退出
+          </button>
+        </div>
+      </div>
     </header>
-    <main class="app-main">
-      <el-tabs v-model="activeTab" class="main-tabs">
-        <el-tab-pane label="Image Gallery" name="gallery">
-          <image-uploader :all-tags="allTags" @tags-updated="handleTagsUpdate" />
-          <el-divider />
-          <image-gallery :key="galleryKey" :all-tags="allTags" @tags-updated="handleTagsUpdate" />
-        </el-tab-pane>
-        <el-tab-pane label="API Key Management" name="api-keys">
-          <api-key-manager :all-tags="allTags" @tags-updated="handleTagsUpdate" />
-        </el-tab-pane>
-        <el-tab-pane v-if="currentUser && currentUser.is_admin" label="User Management" name="user-management">
-          <user-management />
-        </el-tab-pane>
-        <el-tab-pane label="My Profile" name="my-profile">
-          <user-profile />
-        </el-tab-pane>
-        <el-tab-pane label="API Usage" name="api-usage">
-          <el-card class="usage-card">
-            <h2>How to use the API</h2>
-            <p>You can get a random image by using the following API endpoint format. The API will act as a proxy and directly return the image, which can be used in `<img>` tags.</p>
-            <h4>API Endpoint</h4>
-            <code>{{ apiUrlBase }}/api/v1/random/YOUR_API_KEY</code>
-            <p>Replace <code>YOUR_API_KEY</code> with a key you generated in the "API Key Management" tab.</p>
-            <p>The behavior of the endpoint (which tags to use and whether to match ALL or ANY of them) is defined when you create the API Key.</p>
-          </el-card>
-        </el-tab-pane>
-      </el-tabs>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Login v-if="!token" @login-success="handleLoginSuccess" />
+      <div v-else>
+        <Dashboard v-if="activeTab === 'dashboard'" />
+        <SourceManager v-if="activeTab === 'sources'" />
+        <ImageGallery v-if="activeTab === 'gallery'" />
+        <ApiKeyManager v-if="activeTab === 'keys'" />
+      </div>
     </main>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, computed } from 'vue';
-import ImageUploader from './components/ImageUploader.vue';
+<script>
+import Login from './components/Login.vue';
+import Dashboard from './components/Dashboard.vue';
+import SourceManager from './components/SourceManager.vue';
 import ImageGallery from './components/ImageGallery.vue';
 import ApiKeyManager from './components/ApiKeyManager.vue';
-import Login from './components/Login.vue';
-import UserManagement from './components/UserManagement.vue';
-import UserProfile from './components/UserProfile.vue';
-import { getImages, getCurrentUser } from './services/api';
 
-const activeTab = ref('gallery');
-const allTags = ref([]);
-const isAuthenticated = ref(false);
-const currentUser = ref(null);
-const galleryKey = ref(0);
-const apiUrlBase = computed(() => window.location.origin);
-
-const fetchCurrentUser = async () => {
-  try {
-    currentUser.value = await getCurrentUser();
-  } catch (error) {
-    console.error("Failed to fetch current user", error);
-    // This might happen if the token is invalid, so log out.
-    handleLogout();
+export default {
+  name: 'App',
+  components: {
+    Login,
+    Dashboard,
+    SourceManager,
+    ImageGallery,
+    ApiKeyManager
+  },
+  data() {
+    return {
+      token: localStorage.getItem('token') || '',
+      activeTab: 'dashboard',
+      tabs: [
+        { id: 'dashboard', name: '📊 概览看板' },
+        { id: 'sources', name: '🗄️ AList 存储源' },
+        { id: 'gallery', name: '🖼️ 图片画廊' },
+        { id: 'keys', name: '🔑 API 密钥' }
+      ]
+    };
+  },
+  methods: {
+    handleLoginSuccess(token) {
+      this.token = token;
+      localStorage.setItem('token', token);
+      this.activeTab = 'dashboard';
+    },
+    logout() {
+      localStorage.removeItem('token');
+      this.token = '';
+    }
   }
 };
-
-const checkAuth = () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    isAuthenticated.value = true;
-    fetchAllTags();
-    fetchCurrentUser();
-  }
-};
-
-const handleAuthentication = () => {
-  isAuthenticated.value = true;
-  fetchAllTags();
-  fetchCurrentUser();
-};
-
-const handleLogout = () => {
-  localStorage.removeItem('token');
-  isAuthenticated.value = false;
-  currentUser.value = null;
-  // Force a reload to ensure a clean state for the entire application
-  window.location.reload();
-};
-
-const fetchAllTags = async () => {
-  try {
-    const data = await getImages({ limit: 1000 }); // A simple way to get all tags
-    const tagSet = new Set();
-    data.images.forEach(image => {
-      image.tags.forEach(tag => tagSet.add(tag.name));
-    });
-    allTags.value = Array.from(tagSet).sort();
-  } catch (error) {
-    console.error('Failed to fetch all tags:', error);
-  }
-};
-
-const handleTagsUpdate = () => {
-  fetchAllTags();
-  galleryKey.value++;
-};
-
-onMounted(() => {
-  checkAuth();
-});
 </script>
-
-<style>
-/* Global Styles */
-body {
-  background-color: #f4f7f9;
-  color: #1f2937;
-  margin: 0;
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', "\\\\5FAE软雅黑", Arial, sans-serif;
-}
-
-.app-container {
-  padding: 0 2rem;
-}
-
-/* Header */
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background-color: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1rem 2rem;
-  text-align: center;
-  margin: 0 -2rem; /* Extend to full width */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logout-button {
-  position: absolute;
-  right: 2rem;
-}
-
-.app-header h1 {
-  color: #1f2937;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.app-main {
-  padding: 2rem 0;
-}
-
-/* Tabs */
-.main-tabs .el-tabs__header {
-  margin-bottom: 2rem;
-}
-.main-tabs .el-tabs__item {
-  font-size: 1rem;
-  color: #6b7280;
-  padding: 0 20px;
-}
-.main-tabs .el-tabs__item.is-active {
-  color: #3B82F6;
-}
-.main-tabs .el-tabs__active-bar {
-  background-color: #3B82F6;
-  height: 3px;
-}
-.main-tabs .el-tabs__nav-wrap::after {
-  display: none; /* Remove default bottom border */
-}
-
-/* General Card Style */
-.el-card {
-  border-radius: 12px !important;
-  border: none !important;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
-}
-
-.usage-card {
-  padding: 1.5rem;
-}
-.usage-card h2 {
-  margin-top: 0;
-  color: #1f2937;
-}
-.usage-card code {
-  background-color: #e9e9eb;
-  padding: 3px 6px;
-  border-radius: 6px;
-  margin: 0 4px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-}
-</style>
